@@ -134,6 +134,18 @@ func makeDomainsFile(zonefile string) {
 	runtime.GC()
 }
 
+func writeStatsFile() {
+	f, err := os.Create(*directory + "stats")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	for _, zone := range zones {
+		f.WriteString(fmt.Sprintf("SOA: %20s\tNum.Domains: %d\n", zone.SOA, zone.Count))
+	}
+	f.Sync()
+}
+
 func main() {
 	checkFlags()
 
@@ -153,7 +165,6 @@ func main() {
 	<-loadDone
 	work.Wait()
 
-	for _, zone := range zones {
-		log.Printf("SOA: %20s\tNum.Domains: %d", zone.SOA, zone.Count)
-	}
+	writeStatsFile()
+
 }
