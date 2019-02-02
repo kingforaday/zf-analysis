@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/cheggaaa/pb"
 	"zf-analysis/zoneparse"
+	"zf-analysis/zoneparse/comparse"
 )
 
 var (
@@ -82,9 +84,20 @@ func worker(bar *pb.ProgressBar) {
 }
 
 func makeDomainsFile(zonefile string) {
+	// Special case com.zone file
+	if strings.Contains(zonefile, "com.zone.gz") {
+		soa, count := comparse.Parse(zonefile)
+		zones = append(zones, ZoneInfo{
+			SOA:   soa,
+			Count: count,
+		})
+		return
+	}
+
 	stream, err := os.Open(zonefile)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("ERR: %s not found; skipping", zonefile)
+		return
 	}
 	defer stream.Close()
 
@@ -103,7 +116,11 @@ func makeDomainsFile(zonefile string) {
 	for {
 		err := scanner.Next(&record)
 		if err != nil {
-			break
+			if err == io.EOF {
+				break
+			}
+			//log.Println(err)
+			continue
 		}
 
 		v("a '%s' Record for domain/subdomain '%s'\n",
@@ -153,6 +170,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// add com and org
+	matches = append(matches, []string{*directory + "com.zone.gz", *directory + "org.zone.gz"}...)
+
 	bar := pb.New(len(matches))
 	if *pbar {
 		bar.Start()
